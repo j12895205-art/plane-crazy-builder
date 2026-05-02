@@ -3,6 +3,7 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { supabase } from "../supabase";
 import { BLOCKS } from "../blockRegistry";
+const rotation = new THREE.Euler(0, 0, 0);
 
 type BlockData = {
   x: number;
