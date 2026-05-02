@@ -15,13 +15,16 @@ type BlockData = {
 };
 
 export function renderEditor() {
+  // ─────────────────────────────
+  // RESET UI
+  // ─────────────────────────────
   document.body.innerHTML = "";
   document.body.style.margin = "0";
   document.body.style.overflow = "hidden";
   document.body.style.background = "#2b2b2b";
 
   // ─────────────────────────────
-  // THREE
+  // THREE SETUP
   // ─────────────────────────────
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x2b2b2b);
@@ -44,7 +47,7 @@ export function renderEditor() {
   scene.add(new THREE.GridHelper(50, 50));
 
   // ─────────────────────────────
-  // INPUT
+  // INPUT SYSTEM
   // ─────────────────────────────
   const raycaster = new THREE.Raycaster();
   const mouse = new THREE.Vector2();
@@ -81,15 +84,21 @@ export function renderEditor() {
   // ROTATION (R T Y)
   // ─────────────────────────────
   window.addEventListener("keydown", (e) => {
-    if (e.key.toLowerCase() === "r") rotY += Math.PI / 2;
-    if (e.key.toLowerCase() === "t") rotX += Math.PI / 2;
-    if (e.key.toLowerCase() === "y") rotZ += Math.PI / 2;
+    const k = e.key.toLowerCase();
 
-    if (ghost) ghost.rotation.set(rotX, rotY, rotZ);
+    if (k === "r") rotY += Math.PI / 2;
+    if (k === "t") rotX += Math.PI / 2;
+    if (k === "y") rotZ += Math.PI / 2;
+
+    if (ghost) {
+      ghost.rotation.x = rotX;
+      ghost.rotation.y = rotY;
+      ghost.rotation.z = rotZ;
+    }
   });
 
   // ─────────────────────────────
-  // UI TOP BAR (RESTORED)
+  // UI TOP BAR
   // ─────────────────────────────
   const ui = document.createElement("div");
   ui.style.position = "absolute";
@@ -101,10 +110,10 @@ export function renderEditor() {
   ui.style.zIndex = "10";
   document.body.appendChild(ui);
 
-  function btn(t: string, f: () => void) {
+  function btn(text: string, fn: () => void) {
     const b = document.createElement("button");
-    b.innerText = t;
-    b.onclick = f;
+    b.innerText = text;
+    b.onclick = fn;
     ui.appendChild(b);
   }
 
@@ -112,6 +121,7 @@ export function renderEditor() {
   btn("Delete", () => (tool = "delete"));
   btn("Paint", () => (tool = "paint"));
   btn("Save", save);
+
   btn("Gallery", async () => {
     const m = await import("./gallery");
     m.renderGallery();
@@ -124,7 +134,7 @@ export function renderEditor() {
   ui.appendChild(color);
 
   // ─────────────────────────────
-  // CATEGORY UI (RESTORED)
+  // CATEGORY UI
   // ─────────────────────────────
   const panel = document.createElement("div");
   panel.style.position = "absolute";
@@ -184,7 +194,7 @@ export function renderEditor() {
   renderUI();
 
   // ─────────────────────────────
-  // GHOST (UNCHANGED)
+  // GHOST (UNCHANGED STRUCTURE)
   // ─────────────────────────────
   function createGhost() {
     if (ghost) scene.remove(ghost);
@@ -203,10 +213,14 @@ export function renderEditor() {
         }
       });
 
-      ghost.rotation.set(rotX, rotY, rotZ);
+      ghost.rotation.x = rotX;
+      ghost.rotation.y = rotY;
+      ghost.rotation.z = rotZ;
+
       scene.add(ghost);
     });
   }
+
   createGhost();
 
   // ─────────────────────────────
@@ -244,7 +258,9 @@ export function renderEditor() {
       const obj = gltf.scene;
 
       obj.position.set(x, y, z);
-      obj.rotation.set(rotX, rotY, rotZ);
+      obj.rotation.x = rotX;
+      obj.rotation.y = rotY;
+      obj.rotation.z = rotZ;
 
       scene.add(obj);
       placed.push(obj as any);
@@ -253,7 +269,7 @@ export function renderEditor() {
   }
 
   // ─────────────────────────────
-  // CLICK (UNCHANGED CORE)
+  // CLICK
   // ─────────────────────────────
   window.addEventListener("pointerdown", () => {
     raycaster.setFromCamera(mouse, camera);
