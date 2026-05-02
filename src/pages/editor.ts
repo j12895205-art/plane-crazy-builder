@@ -4,95 +4,21 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { supabase } from "../supabase";
 import { BLOCKS } from "../blockRegistry";
 
-// ─────────────────────────────
-// LOGIN POPUP (UNCHANGED)
-// ─────────────────────────────
-function showLoginPopup(onSuccess: () => void) {
-  const overlay = document.createElement("div");
-  overlay.style.position = "fixed";
-  overlay.style.top = "0";
-  overlay.style.left = "0";
-  overlay.style.width = "100%";
-  overlay.style.height = "100%";
-  overlay.style.background = "rgba(0,0,0,0.85)";
-  overlay.style.display = "flex";
-  overlay.style.alignItems = "center";
-  overlay.style.justifyContent = "center";
-  overlay.style.zIndex = "9999";
+type BlockData = {
+  x: number;
+  y: number;
+  z: number;
+  color: string;
+  rx: number;
+  ry: number;
+  rz: number;
+};
 
-  const box = document.createElement("div");
-  box.style.background = "#111";
-  box.style.padding = "20px";
-  box.style.borderRadius = "10px";
-  box.style.width = "260px";
-  box.style.color = "white";
-
-  const email = document.createElement("input");
-  email.placeholder = "email";
-  email.style.width = "100%";
-
-  const password = document.createElement("input");
-  password.type = "password";
-  password.placeholder = "password";
-  password.style.width = "100%";
-
-  const login = document.createElement("button");
-  login.innerText = "Login";
-  login.style.width = "100%";
-
-  const signup = document.createElement("button");
-  signup.innerText = "Register";
-  signup.style.width = "100%";
-
-  const status = document.createElement("div");
-
-  login.onclick = async () => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email: email.value,
-      password: password.value
-    });
-
-    if (!error) {
-      overlay.remove();
-      onSuccess();
-    } else {
-      status.innerText = error.message;
-    }
-  };
-
-  signup.onclick = async () => {
-    const { error } = await supabase.auth.signUp({
-      email: email.value,
-      password: password.value
-    });
-
-    if (!error) {
-      overlay.remove();
-      onSuccess();
-    } else {
-      status.innerText = error.message;
-    }
-  };
-
-  box.append(email, password, login, signup, status);
-  overlay.appendChild(box);
-  document.body.appendChild(overlay);
-}
-
-// ─────────────────────────────
-// MAIN
-// ─────────────────────────────
-export async function renderEditor() {
-  const { data } = await supabase.auth.getUser();
-
-  if (!data.user) {
-    showLoginPopup(() => renderEditor());
-    return;
-  }
-
+export function renderEditor() {
   document.body.innerHTML = "";
   document.body.style.margin = "0";
   document.body.style.overflow = "hidden";
+  document.body.style.background = "#2b2b2b";
 
   // ─────────────────────────────
   // THREE SETUP
@@ -136,100 +62,70 @@ export async function renderEditor() {
   let tool: "place" | "delete" | "paint" = "place";
   let selected = BLOCKS[0];
 
-  const loader = new GLTFLoader();
-
   const placed: THREE.Object3D[] = [];
   const grid = new Set<string>();
-  const key = (x:number,y:number,z:number)=>`${x},${y},${z}`;
+
+  const key = (x: number, y: number, z: number) => `${x},${y},${z}`;
+
+  const loader = new GLTFLoader();
 
   let ghost: THREE.Group | null = null;
-  let paintColor = "#ffffff";
+
+  let rotX = 0;
+  let rotY = 0;
+  let rotZ = 0;
 
   // ─────────────────────────────
-  // UI (TOP BAR)
+  // ROTATION CONTROLS (R T Y)
+  // ─────────────────────────────
+  window.addEventListener("keydown", (e) => {
+    if (e.key.toLowerCase() === "r") {
+      rotY += Math.PI / 2;
+    }
+    if (e.key.toLowerCase() === "t") {
+      rotX += Math.PI / 2;
+    }
+    if (e.key.toLowerCase() === "y") {
+      rotZ += Math.PI / 2;
+    }
+
+    if (ghost) {
+      ghost.rotation.set(rotX, rotY, rotZ);
+    }
+  });
+
+  // ─────────────────────────────
+  // UI
   // ─────────────────────────────
   const ui = document.createElement("div");
   ui.style.position = "absolute";
   ui.style.top = "10px";
-  ui.style.left = "50%";
-  ui.style.transform = "translateX(-50%)";
+  ui.style.left = "10px";
   ui.style.background = "#111";
+  ui.style.color = "#fff";
   ui.style.padding = "10px";
+  ui.style.zIndex = "10";
   document.body.appendChild(ui);
 
-  function btn(t:string,f:()=>void){
-    const b=document.createElement("button");
-    b.innerText=t;
-    b.onclick=f;
+  function btn(text: string, fn: () => void) {
+    const b = document.createElement("button");
+    b.innerText = text;
+    b.onclick = fn;
     ui.appendChild(b);
   }
 
-  btn("Place",()=>tool="place");
-  btn("Delete",()=>tool="delete");
-  btn("Paint",()=>tool="paint");
-  btn("Save",save);
-
-  const color = document.createElement("input");
-  color.type = "color";
-  color.value = paintColor;
-  color.oninput = ()=>paintColor=color.value;
-  ui.appendChild(color);
-
-  btn("Gallery", async () => {
-    const m = await import("./gallery");
-    m.renderGallery();
-  });
+  btn("Place", () => (tool = "place"));
+  btn("Delete", () => (tool = "delete"));
+  btn("Paint", () => (tool = "paint"));
+  btn("Save", save);
 
   // ─────────────────────────────
-  // CATEGORY UI (UNCHANGED)
-  // ─────────────────────────────
-  const panel = document.createElement("div");
-  panel.style.position = "absolute";
-  panel.style.left = "10px";
-  panel.style.top = "50%";
-  panel.style.transform = "translateY(-50%)";
-  panel.style.background = "#111";
-  panel.style.padding = "10px";
-  document.body.appendChild(panel);
-
-  const categories = [...new Set(BLOCKS.map(b => b.category))];
-  let current = categories[0];
-
-  const catBox = document.createElement("div");
-  const blockBox = document.createElement("div");
-  panel.append(catBox, blockBox);
-
-  function renderUI() {
-    catBox.innerHTML = "";
-    blockBox.innerHTML = "";
-
-    categories.forEach(c => {
-      const b = document.createElement("button");
-      b.innerText = c;
-      b.onclick = () => { current = c; renderUI(); };
-      catBox.appendChild(b);
-    });
-
-    BLOCKS.filter(b => b.category === current).forEach(bk => {
-      const b = document.createElement("button");
-      b.innerText = bk.name;
-      b.onclick = () => {
-        selected = bk;
-        createGhost();
-      };
-      blockBox.appendChild(b);
-    });
-  }
-
-  renderUI();
-
-  // ─────────────────────────────
-  // GHOST (RESTORED ORIGINAL)
+  // GHOST (UNCHANGED)
   // ─────────────────────────────
   function createGhost() {
     if (ghost) scene.remove(ghost);
 
-    loader.load(selected.model, gltf => {
+    loader.load(selected.model, (gltf: any) => {
       ghost = gltf.scene;
 
       ghost.traverse((c: any) => {
@@ -243,23 +139,20 @@ export async function renderEditor() {
         }
       });
 
+      ghost.rotation.set(rotX, rotY, rotZ);
       scene.add(ghost);
     });
   }
-
   createGhost();
 
   // ─────────────────────────────
   // MOUSE
   // ─────────────────────────────
-  window.addEventListener("pointermove", e => {
+  window.addEventListener("pointermove", (e) => {
     mouse.x = (e.clientX / innerWidth) * 2 - 1;
     mouse.y = -(e.clientY / innerHeight) * 2 + 1;
   });
 
-  // ─────────────────────────────
-  // 🔥 ORIGINAL RAYCAST PLACEMENT (UNCHANGED)
-  // ─────────────────────────────
   function updateRay() {
     raycaster.setFromCamera(mouse, camera);
     const hits = raycaster.intersectObjects([ground, ...placed], true);
@@ -267,7 +160,6 @@ export async function renderEditor() {
     if (!hits.length || !ghost) return;
 
     const hit = hits[0];
-
     const p = hit.point;
     const n = hit.face?.normal || new THREE.Vector3(0, 1, 0);
 
@@ -275,42 +167,47 @@ export async function renderEditor() {
     const y = Math.round(p.y + n.y * 0.5);
     const z = Math.round(p.z + n.z * 0.5);
 
-    const ok = !grid.has(key(x,y,z));
+    const ok = !grid.has(key(x, y, z));
 
     ghost.visible = ok;
-    ghost.position.set(x,y,z);
-
-    (ghost.children[0] as any)?.material?.color?.set(
-      ok ? 0x00ff00 : 0xff0000
-    );
+    ghost.position.set(x, y, z);
   }
 
-  function place(x:number,y:number,z:number){
-    if (grid.has(key(x,y,z))) return;
+  // ─────────────────────────────
+  // PLACE
+  // ─────────────────────────────
+  function place(x: number, y: number, z: number) {
+    if (grid.has(key(x, y, z))) return;
 
     loader.load(selected.model, (gltf: any) => {
       const obj = gltf.scene;
-      obj.position.set(x,y,z);
+
+      obj.position.set(x, y, z);
+      obj.rotation.set(rotX, rotY, rotZ);
 
       scene.add(obj);
       placed.push(obj as any);
-      grid.add(key(x,y,z));
+
+      grid.add(key(x, y, z));
     });
   }
 
+  // ─────────────────────────────
+  // CLICK
+  // ─────────────────────────────
   window.addEventListener("pointerdown", () => {
     raycaster.setFromCamera(mouse, camera);
     const hits = raycaster.intersectObjects([ground, ...placed], true);
     if (!hits.length) return;
 
     const p = hits[0].point;
-    const n = hits[0].face?.normal || new THREE.Vector3(0,1,0);
+    const n = hits[0].face?.normal || new THREE.Vector3(0, 1, 0);
 
     const x = Math.round(p.x + n.x * 0.5);
     const y = Math.round(p.y + n.y * 0.5);
     const z = Math.round(p.z + n.z * 0.5);
 
-    if (tool === "place") place(x,y,z);
+    if (tool === "place") place(x, y, z);
 
     if (tool === "delete") {
       const obj = hits[0].object.parent;
@@ -320,33 +217,34 @@ export async function renderEditor() {
 
     if (tool === "paint") {
       const obj = hits[0].object as any;
-      if (obj?.material) {
-        obj.material.color = new THREE.Color(paintColor);
-      }
+      if (obj?.material) obj.material.color = new THREE.Color("#ff0000");
     }
   });
 
   // ─────────────────────────────
   // SAVE
   // ─────────────────────────────
-  async function save(){
+  async function save() {
     const { data } = await supabase.auth.getUser();
     if (!data.user) return;
 
-    const blueprint = placed.map(p => ({
-      x:p.position.x,
-      y:p.position.y,
-      z:p.position.z,
-      color:"#fff"
+    const blueprint: BlockData[] = placed.map((p: any) => ({
+      x: p.position.x,
+      y: p.position.y,
+      z: p.position.z,
+      color: "#fff",
+      rx: p.rotation.x,
+      ry: p.rotation.y,
+      rz: p.rotation.z
     }));
 
     const name = prompt("Blueprint name?");
     if (!name) return;
 
     await supabase.from("blueprints").insert({
-      user_id:data.user.id,
+      user_id: data.user.id,
       name,
-      data:blueprint
+      data: blueprint
     });
 
     alert("Saved!");
@@ -355,11 +253,11 @@ export async function renderEditor() {
   // ─────────────────────────────
   // LOOP
   // ─────────────────────────────
-  function animate(){
+  function animate() {
     requestAnimationFrame(animate);
     controls.update();
     updateRay();
-    renderer.render(scene,camera);
+    renderer.render(scene, camera);
   }
 
   animate();
