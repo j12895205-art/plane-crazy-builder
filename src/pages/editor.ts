@@ -288,7 +288,7 @@ export async function renderEditor() {
   function place(x:number,y:number,z:number){
     if (grid.has(key(x,y,z))) return;
 
-    loader.load(selected.model, gltf => {
+    loader.load(selected.model, (gltf: any) => {
       const obj = gltf.scene;
       obj.position.set(x,y,z);
 
