@@ -89,9 +89,11 @@ export function renderEditor() {
   window.addEventListener("keydown", (e) => {
     const k = e.key.toLowerCase();
 
-    if (k === "r") rotation.y += Math.PI / 2;
-    if (k === "t") rotation.x += Math.PI / 2;
-    if (k === "y") rotation.z += Math.PI / 2;
+    if (k === "r") rotY += Math.PI / 2;
+    if (k === "t") rotX += Math.PI / 2;
+    if (k === "y") rotZ += Math.PI / 2;
+
+    if (ghost) applyRotation(ghost);
 
     if (ghost) ghost.rotation.copy(rotation);
   });
