@@ -48,6 +48,92 @@ export function renderEditor() {
 
   scene.add(new THREE.GridHelper(50, 50));
 
+
+  // ─────────────────────────────
+// CATEGORY + BLOCK UI (DO NOT MODIFY CORE LOGIC)
+// ─────────────────────────────
+
+const uiPanel = document.createElement("div");
+uiPanel.style.position = "absolute";
+uiPanel.style.left = "10px";
+uiPanel.style.top = "50%";
+uiPanel.style.transform = "translateY(-50%)";
+uiPanel.style.display = "flex";
+uiPanel.style.gap = "10px";
+uiPanel.style.background = "#111";
+uiPanel.style.padding = "10px";
+uiPanel.style.borderRadius = "8px";
+uiPanel.style.zIndex = "10";
+document.body.appendChild(uiPanel);
+
+// LEFT: categories
+const catRow = document.createElement("div");
+catRow.style.display = "flex";
+catRow.style.flexDirection = "column";
+catRow.style.gap = "5px";
+uiPanel.appendChild(catRow);
+
+// RIGHT: blocks
+const blockPanel = document.createElement("div");
+blockPanel.style.display = "flex";
+blockPanel.style.flexDirection = "column";
+blockPanel.style.gap = "5px";
+blockPanel.style.borderLeft = "1px solid #333";
+blockPanel.style.paddingLeft = "10px";
+uiPanel.appendChild(blockPanel);
+
+// categories from registry
+const categories = [...new Set(BLOCKS.map(b => b.category))];
+
+let currentCategory = categories[0];
+
+function renderUI() {
+  catRow.innerHTML = "";
+  blockPanel.innerHTML = "";
+
+  // ───────── categories
+  categories.forEach(cat => {
+    const btnEl = document.createElement("button");
+    btnEl.innerText = cat;
+
+    btnEl.style.width = "120px";
+    btnEl.style.padding = "6px";
+    btnEl.style.cursor = "pointer";
+
+    btnEl.onclick = () => {
+      currentCategory = cat;
+      renderUI();
+    };
+
+    if (cat === currentCategory) {
+      btnEl.style.background = "#444";
+      btnEl.style.color = "#fff";
+    }
+
+    catRow.appendChild(btnEl);
+  });
+
+  // ───────── blocks for selected category
+  BLOCKS.filter(b => b.category === currentCategory).forEach(block => {
+    const btnEl = document.createElement("button");
+    btnEl.innerText = block.name;
+
+    btnEl.style.width = "160px";
+    btnEl.style.padding = "6px";
+    btnEl.style.cursor = "pointer";
+
+    btnEl.onclick = () => {
+      selected = block;
+      createGhost(); // IMPORTANT: keeps your original ghost system untouched
+    };
+
+    blockPanel.appendChild(btnEl);
+  });
+}
+
+renderUI();
+
+  
   // ─────────────────────────────
   // INPUT SYSTEM (UNCHANGED)
   // ─────────────────────────────
