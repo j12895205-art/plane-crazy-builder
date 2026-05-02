@@ -16,9 +16,14 @@ type BlockData = {
 
 export function renderEditor() {
   // ─────────────────────────────
-  // RESET UI
+  // SAFE RESET (DO NOT WIPE UI)
   // ─────────────────────────────
-  document.body.innerHTML = "";
+  const oldCanvas = document.querySelector("canvas");
+  if (oldCanvas) oldCanvas.remove();
+
+  const existingUI = document.getElementById("editor-ui-root");
+  if (existingUI) existingUI.remove();
+
   document.body.style.margin = "0";
   document.body.style.overflow = "hidden";
   document.body.style.background = "#2b2b2b";
@@ -52,7 +57,7 @@ export function renderEditor() {
   scene.add(new THREE.GridHelper(50, 50));
 
   // ─────────────────────────────
-  // INPUT SYSTEM
+  // INPUT
   // ─────────────────────────────
   const raycaster = new THREE.Raycaster();
   const mouse = new THREE.Vector2();
@@ -75,16 +80,22 @@ export function renderEditor() {
   const key = (x: number, y: number, z: number) => `${x},${y},${z}`;
 
   const loader = new GLTFLoader();
-
   let ghost: THREE.Group | null = null;
 
-  // ─────────────────────────────
-  // ROTATION STATE
-  // ─────────────────────────────
-  const rotation = new THREE.Euler(0, 0, 0);
+  let rotX = 0;
+  let rotY = 0;
+  let rotZ = 0;
+
+  let paintColor = "#ffffff";
+
+  function applyRotation(obj: THREE.Object3D) {
+    obj.rotation.x = rotX;
+    obj.rotation.y = rotY;
+    obj.rotation.z = rotZ;
+  }
 
   // ─────────────────────────────
-  // ROTATION INPUT (R T Y)
+  // ROTATION (R T Y)
   // ─────────────────────────────
   window.addEventListener("keydown", (e) => {
     const k = e.key.toLowerCase();
@@ -94,14 +105,13 @@ export function renderEditor() {
     if (k === "y") rotZ += Math.PI / 2;
 
     if (ghost) applyRotation(ghost);
-
-    if (ghost) ghost.rotation.copy(rotation);
   });
 
   // ─────────────────────────────
-  // UI TOP BAR (UNCHANGED STRUCTURE)
+  // TOP UI
   // ─────────────────────────────
   const ui = document.createElement("div");
+  ui.id = "editor-ui-root";
   ui.style.position = "absolute";
   ui.style.top = "10px";
   ui.style.left = "50%";
@@ -128,13 +138,14 @@ export function renderEditor() {
     m.renderGallery();
   });
 
-  const paintColor = document.createElement("input");
-  paintColor.type = "color";
-  paintColor.value = "#ffffff";
-  ui.appendChild(paintColor);
+  const color = document.createElement("input");
+  color.type = "color";
+  color.value = paintColor;
+  color.oninput = () => (paintColor = color.value);
+  ui.appendChild(color);
 
   // ─────────────────────────────
-  // BLOCK UI (UNCHANGED - FIXED STABILITY)
+  // BLOCK UI
   // ─────────────────────────────
   const panel = document.createElement("div");
   panel.style.position = "absolute";
@@ -162,14 +173,14 @@ export function renderEditor() {
   panel.appendChild(catCol);
   panel.appendChild(blockCol);
 
-  const categories = [...new Set(BLOCKS.map(b => b.category))];
+  const categories = [...new Set(BLOCKS.map((b) => b.category))];
   let currentCategory = categories[0];
 
   function renderUI() {
     catCol.innerHTML = "";
     blockCol.innerHTML = "";
 
-    categories.forEach(cat => {
+    categories.forEach((cat) => {
       const b = document.createElement("button");
       b.innerText = cat;
       b.onclick = () => {
@@ -180,7 +191,7 @@ export function renderEditor() {
       catCol.appendChild(b);
     });
 
-    BLOCKS.filter(b => b.category === currentCategory).forEach(block => {
+    BLOCKS.filter((b) => b.category === currentCategory).forEach((block) => {
       const b = document.createElement("button");
       b.innerText = block.name;
       b.onclick = () => {
@@ -194,7 +205,7 @@ export function renderEditor() {
   renderUI();
 
   // ─────────────────────────────
-  // GHOST (UNCHANGED EXACT LOGIC)
+  // GHOST (UNCHANGED LOGIC)
   // ─────────────────────────────
   function createGhost() {
     if (ghost) scene.remove(ghost);
@@ -208,12 +219,12 @@ export function renderEditor() {
             color: 0xff0000,
             wireframe: true,
             transparent: true,
-            opacity: 0.5
+            opacity: 0.5,
           });
         }
       });
 
-      ghost.rotation.copy(rotation);
+      applyRotation(ghost);
       scene.add(ghost);
     });
   }
@@ -231,7 +242,6 @@ export function renderEditor() {
   function updateRay() {
     raycaster.setFromCamera(mouse, camera);
     const hits = raycaster.intersectObjects([ground, ...placed], true);
-
     if (!hits.length || !ghost) return;
 
     const p = hits[0].point;
@@ -243,7 +253,6 @@ export function renderEditor() {
 
     ghost.visible = !grid.has(key(x, y, z));
     ghost.position.set(x, y, z);
-    ghost.rotation.copy(rotation);
   }
 
   // ─────────────────────────────
@@ -256,7 +265,7 @@ export function renderEditor() {
       const obj = gltf.scene;
 
       obj.position.set(x, y, z);
-      obj.rotation.copy(rotation);
+      applyRotation(obj);
 
       scene.add(obj);
       placed.push(obj as any);
@@ -290,7 +299,7 @@ export function renderEditor() {
     if (tool === "paint") {
       const obj = hits[0].object as any;
       if (obj?.material) {
-        obj.material.color = new THREE.Color(paintColor.value);
+        obj.material.color = new THREE.Color(paintColor);
       }
     }
   });
@@ -309,7 +318,7 @@ export function renderEditor() {
       color: "#fff",
       rx: p.rotation.x,
       ry: p.rotation.y,
-      rz: p.rotation.z
+      rz: p.rotation.z,
     }));
 
     const name = prompt("Blueprint name?");
@@ -318,7 +327,7 @@ export function renderEditor() {
     await supabase.from("blueprints").insert({
       user_id: data.user.id,
       name,
-      data: blueprint
+      data: blueprint,
     });
 
     alert("Saved!");
