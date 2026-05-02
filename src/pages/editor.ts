@@ -21,7 +21,7 @@ export function renderEditor() {
   document.body.style.background = "#2b2b2b";
 
   // ─────────────────────────────
-  // THREE SETUP
+  // THREE
   // ─────────────────────────────
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x2b2b2b);
@@ -75,42 +75,36 @@ export function renderEditor() {
   let rotY = 0;
   let rotZ = 0;
 
+  let paintColor = "#ffffff";
+
   // ─────────────────────────────
-  // ROTATION CONTROLS (R T Y)
+  // ROTATION (R T Y)
   // ─────────────────────────────
   window.addEventListener("keydown", (e) => {
-    if (e.key.toLowerCase() === "r") {
-      rotY += Math.PI / 2;
-    }
-    if (e.key.toLowerCase() === "t") {
-      rotX += Math.PI / 2;
-    }
-    if (e.key.toLowerCase() === "y") {
-      rotZ += Math.PI / 2;
-    }
+    if (e.key.toLowerCase() === "r") rotY += Math.PI / 2;
+    if (e.key.toLowerCase() === "t") rotX += Math.PI / 2;
+    if (e.key.toLowerCase() === "y") rotZ += Math.PI / 2;
 
-    if (ghost) {
-      ghost.rotation.set(rotX, rotY, rotZ);
-    }
+    if (ghost) ghost.rotation.set(rotX, rotY, rotZ);
   });
 
   // ─────────────────────────────
-  // UI
+  // UI TOP BAR (RESTORED)
   // ─────────────────────────────
   const ui = document.createElement("div");
   ui.style.position = "absolute";
   ui.style.top = "10px";
-  ui.style.left = "10px";
+  ui.style.left = "50%";
+  ui.style.transform = "translateX(-50%)";
   ui.style.background = "#111";
-  ui.style.color = "#fff";
   ui.style.padding = "10px";
   ui.style.zIndex = "10";
   document.body.appendChild(ui);
 
-  function btn(text: string, fn: () => void) {
+  function btn(t: string, f: () => void) {
     const b = document.createElement("button");
-    b.innerText = text;
-    b.onclick = fn;
+    b.innerText = t;
+    b.onclick = f;
     ui.appendChild(b);
   }
 
@@ -118,6 +112,76 @@ export function renderEditor() {
   btn("Delete", () => (tool = "delete"));
   btn("Paint", () => (tool = "paint"));
   btn("Save", save);
+  btn("Gallery", async () => {
+    const m = await import("./gallery");
+    m.renderGallery();
+  });
+
+  const color = document.createElement("input");
+  color.type = "color";
+  color.value = paintColor;
+  color.oninput = () => (paintColor = color.value);
+  ui.appendChild(color);
+
+  // ─────────────────────────────
+  // CATEGORY UI (RESTORED)
+  // ─────────────────────────────
+  const panel = document.createElement("div");
+  panel.style.position = "absolute";
+  panel.style.left = "10px";
+  panel.style.top = "50%";
+  panel.style.transform = "translateY(-50%)";
+  panel.style.display = "flex";
+  panel.style.gap = "10px";
+  panel.style.background = "#111";
+  panel.style.padding = "10px";
+  document.body.appendChild(panel);
+
+  const catCol = document.createElement("div");
+  catCol.style.display = "flex";
+  catCol.style.flexDirection = "column";
+  catCol.style.gap = "5px";
+
+  const blockCol = document.createElement("div");
+  blockCol.style.display = "flex";
+  blockCol.style.flexDirection = "column";
+  blockCol.style.gap = "5px";
+  blockCol.style.borderLeft = "1px solid #333";
+  blockCol.style.paddingLeft = "10px";
+
+  panel.appendChild(catCol);
+  panel.appendChild(blockCol);
+
+  const categories = [...new Set(BLOCKS.map(b => b.category))];
+  let currentCategory = categories[0];
+
+  function renderUI() {
+    catCol.innerHTML = "";
+    blockCol.innerHTML = "";
+
+    categories.forEach(cat => {
+      const b = document.createElement("button");
+      b.innerText = cat;
+      b.onclick = () => {
+        currentCategory = cat;
+        renderUI();
+      };
+      if (cat === currentCategory) b.style.background = "#444";
+      catCol.appendChild(b);
+    });
+
+    BLOCKS.filter(b => b.category === currentCategory).forEach(block => {
+      const b = document.createElement("button");
+      b.innerText = block.name;
+      b.onclick = () => {
+        selected = block;
+        createGhost();
+      };
+      blockCol.appendChild(b);
+    });
+  }
+
+  renderUI();
 
   // ─────────────────────────────
   // GHOST (UNCHANGED)
@@ -159,17 +223,14 @@ export function renderEditor() {
 
     if (!hits.length || !ghost) return;
 
-    const hit = hits[0];
-    const p = hit.point;
-    const n = hit.face?.normal || new THREE.Vector3(0, 1, 0);
+    const p = hits[0].point;
+    const n = hits[0].face?.normal || new THREE.Vector3(0, 1, 0);
 
     const x = Math.round(p.x + n.x * 0.5);
     const y = Math.round(p.y + n.y * 0.5);
     const z = Math.round(p.z + n.z * 0.5);
 
-    const ok = !grid.has(key(x, y, z));
-
-    ghost.visible = ok;
+    ghost.visible = !grid.has(key(x, y, z));
     ghost.position.set(x, y, z);
   }
 
@@ -187,13 +248,12 @@ export function renderEditor() {
 
       scene.add(obj);
       placed.push(obj as any);
-
       grid.add(key(x, y, z));
     });
   }
 
   // ─────────────────────────────
-  // CLICK
+  // CLICK (UNCHANGED CORE)
   // ─────────────────────────────
   window.addEventListener("pointerdown", () => {
     raycaster.setFromCamera(mouse, camera);
@@ -217,7 +277,7 @@ export function renderEditor() {
 
     if (tool === "paint") {
       const obj = hits[0].object as any;
-      if (obj?.material) obj.material.color = new THREE.Color("#ff0000");
+      if (obj?.material) obj.material.color = new THREE.Color(paintColor);
     }
   });
 
