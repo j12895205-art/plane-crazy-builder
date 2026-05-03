@@ -11,7 +11,17 @@ type BlockData = {
   color: string;
 };
 
-export function renderEditor() {
+export async function renderEditor() {
+
+  // 🔐 AUTH CHECK (NEW)
+  const { data } = await supabase.auth.getUser();
+  if (!data.user) {
+    alert("You must be logged in to use the editor.");
+    const m = await import("./auth");
+    m.renderAuth();
+    return;
+  }
+
   // ─────────────────────────────
   // RESET
   // ─────────────────────────────
@@ -26,12 +36,7 @@ export function renderEditor() {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x2b2b2b);
 
-  const camera = new THREE.PerspectiveCamera(
-    75,
-    innerWidth / innerHeight,
-    0.1,
-    1000
-  );
+  const camera = new THREE.PerspectiveCamera(75, innerWidth / innerHeight, 0.1, 1000);
   camera.position.set(8, 8, 8);
 
   const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -85,11 +90,11 @@ export function renderEditor() {
   let paintColor = "#ffffff";
 
   // ─────────────────────────────
-  // ROTATION (FIXED SAFE VERSION)
+  // ROTATION
   // ─────────────────────────────
   window.addEventListener("keydown", (e) => {
     const target = e.target as HTMLElement;
-    if (target && ["INPUT", "TEXTAREA", "BUTTON"].includes(target.tagName)) return;
+    if (["INPUT", "TEXTAREA", "BUTTON"].includes(target.tagName)) return;
 
     const k = e.key.toLowerCase();
 
@@ -97,13 +102,11 @@ export function renderEditor() {
     if (k === "t") rotX += Math.PI / 2;
     if (k === "y") rotZ += Math.PI / 2;
 
-    if (ghost) {
-      ghost.rotation.set(rotX, rotY, rotZ);
-    }
+    if (ghost) ghost.rotation.set(rotX, rotY, rotZ);
   });
 
   // ─────────────────────────────
-  // UI TOP BAR (UNCHANGED STRUCTURE)
+  // TOP UI
   // ─────────────────────────────
   const ui = document.createElement("div");
   ui.style.position = "absolute";
@@ -127,96 +130,92 @@ export function renderEditor() {
   btn("Paint", () => (tool = "paint"));
   btn("Save", save);
 
+  // 🌐 NAVIGATION
+  btn("Gallery", async () => {
+    const m = await import("./gallery");
+    m.renderGallery();
+  });
+
+  btn("Tutorial", async () => {
+    const m = await import("./tutorial");
+    m.renderTutorial();
+  });
+
+  btn("Logout", async () => {
+    await supabase.auth.signOut();
+    location.reload();
+  });
+
   const colorPicker = document.createElement("input");
   colorPicker.type = "color";
   colorPicker.value = paintColor;
   colorPicker.oninput = () => (paintColor = colorPicker.value);
   ui.appendChild(colorPicker);
 
-  btn("Gallery", async () => {
-    const m = await import("./gallery");
-    m.renderGallery();
-  });
-
   // ─────────────────────────────
-  // BLOCK UI (UNCHANGED)
+  // CATEGORY + BLOCK UI
   // ─────────────────────────────
-  // ─────────────────────────────
-// CATEGORY + BLOCK UI (NEW)
-// ─────────────────────────────
-const panel = document.createElement("div");
-panel.style.position = "absolute";
-panel.style.left = "10px";
-panel.style.top = "50%";
-panel.style.transform = "translateY(-50%)";
-panel.style.display = "flex";
-panel.style.gap = "10px";
-panel.style.background = "#111";
-panel.style.padding = "10px";
-document.body.appendChild(panel);
+  const panel = document.createElement("div");
+  panel.style.position = "absolute";
+  panel.style.left = "10px";
+  panel.style.top = "50%";
+  panel.style.transform = "translateY(-50%)";
+  panel.style.display = "flex";
+  panel.style.gap = "10px";
+  panel.style.background = "#111";
+  panel.style.padding = "10px";
+  document.body.appendChild(panel);
 
-// LEFT: categories
-const catCol = document.createElement("div");
-catCol.style.display = "flex";
-catCol.style.flexDirection = "column";
-catCol.style.gap = "5px";
+  const catCol = document.createElement("div");
+  catCol.style.display = "flex";
+  catCol.style.flexDirection = "column";
+  catCol.style.gap = "5px";
 
-// RIGHT: blocks
-const blockCol = document.createElement("div");
-blockCol.style.display = "flex";
-blockCol.style.flexDirection = "column";
-blockCol.style.gap = "5px";
-blockCol.style.borderLeft = "1px solid #333";
-blockCol.style.paddingLeft = "10px";
+  const blockCol = document.createElement("div");
+  blockCol.style.display = "flex";
+  blockCol.style.flexDirection = "column";
+  blockCol.style.gap = "5px";
+  blockCol.style.borderLeft = "1px solid #333";
+  blockCol.style.paddingLeft = "10px";
 
-panel.appendChild(catCol);
-panel.appendChild(blockCol);
+  panel.appendChild(catCol);
+  panel.appendChild(blockCol);
 
-// get categories from BLOCKS
-const categories = [...new Set(BLOCKS.map(b => b.category))];
-let currentCategory = categories[0];
+  const categories = [...new Set(BLOCKS.map(b => b.category))];
+  let currentCategory = categories[0];
 
-function renderUI() {
-  catCol.innerHTML = "";
-  blockCol.innerHTML = "";
+  function renderUI() {
+    catCol.innerHTML = "";
+    blockCol.innerHTML = "";
 
-  // categories
-  categories.forEach(cat => {
-    const b = document.createElement("button");
-    b.innerText = cat;
-
-    b.onclick = () => {
-      currentCategory = cat;
-      renderUI();
-    };
-
-    if (cat === currentCategory) {
-      b.style.background = "#444";
-    }
-
-    catCol.appendChild(b);
-  });
-
-  // blocks
-  BLOCKS
-    .filter(b => b.category === currentCategory)
-    .forEach(block => {
+    categories.forEach(cat => {
       const b = document.createElement("button");
-      b.innerText = block.name;
-
+      b.innerText = cat;
       b.onclick = () => {
-        selected = block;
-        createGhost();
+        currentCategory = cat;
+        renderUI();
       };
-
-      blockCol.appendChild(b);
+      if (cat === currentCategory) b.style.background = "#444";
+      catCol.appendChild(b);
     });
-}
 
-renderUI();
+    BLOCKS
+      .filter(b => b.category === currentCategory)
+      .forEach(block => {
+        const b = document.createElement("button");
+        b.innerText = block.name;
+        b.onclick = () => {
+          selected = block;
+          createGhost();
+        };
+        blockCol.appendChild(b);
+      });
+  }
+
+  renderUI();
 
   // ─────────────────────────────
-  // GHOST (UNCHANGED)
+  // GHOST
   // ─────────────────────────────
   function createGhost() {
     if (ghost) scene.remove(ghost);
@@ -236,7 +235,6 @@ renderUI();
       });
 
       ghost.rotation.set(rotX, rotY, rotZ);
-
       scene.add(ghost);
     });
   }
@@ -270,15 +268,11 @@ renderUI();
     ghost.position.set(x, y, z);
   }
 
-  // ─────────────────────────────
-  // PLACE
-  // ─────────────────────────────
   function place(x: number, y: number, z: number) {
     if (grid.has(key(x, y, z))) return;
 
     loader.load(selected.model, (gltf: any) => {
       const obj = gltf.scene;
-
       obj.position.set(x, y, z);
       obj.rotation.set(rotX, rotY, rotZ);
 
@@ -288,9 +282,6 @@ renderUI();
     });
   }
 
-  // ─────────────────────────────
-  // CLICK
-  // ─────────────────────────────
   window.addEventListener("pointerdown", () => {
     raycaster.setFromCamera(mouse, camera);
     const hits = raycaster.intersectObjects([ground, ...placed], true);
@@ -307,21 +298,17 @@ renderUI();
 
     if (tool === "delete") {
       const obj = hits[0].object.parent;
-      if (!obj) return;
-      scene.remove(obj);
+      if (obj) scene.remove(obj);
     }
 
     if (tool === "paint") {
       const obj = hits[0].object as any;
       if (obj?.material) {
-        obj.material.color = new THREE.Color(colorPicker.value);
+        obj.material.color = new THREE.Color(paintColor);
       }
     }
   });
 
-  // ─────────────────────────────
-  // SAVE
-  // ─────────────────────────────
   async function save() {
     const { data } = await supabase.auth.getUser();
     if (!data.user) return;
@@ -345,9 +332,6 @@ renderUI();
     alert("Saved!");
   }
 
-  // ─────────────────────────────
-  // LOOP
-  // ─────────────────────────────
   function animate() {
     requestAnimationFrame(animate);
     controls.update();
