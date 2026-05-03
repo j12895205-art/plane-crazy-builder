@@ -8,16 +8,12 @@ type BlockData = {
   x: number;
   y: number;
   z: number;
-  id?: string;
-  rotX?: number;
-  rotY?: number;
-  rotZ?: number;
-  color?: string;
+  color: string;
 };
 
 export function renderEditor() {
   // ─────────────────────────────
-  // RESET UI
+  // RESET
   // ─────────────────────────────
   document.body.innerHTML = "";
   document.body.style.margin = "0";
@@ -25,7 +21,7 @@ export function renderEditor() {
   document.body.style.background = "#2b2b2b";
 
   // ─────────────────────────────
-  // SCENE SETUP
+  // THREE SETUP
   // ─────────────────────────────
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x2b2b2b);
@@ -46,7 +42,6 @@ export function renderEditor() {
   controls.enableDamping = true;
 
   scene.add(new THREE.AmbientLight(0xffffff, 1));
-
   const light = new THREE.DirectionalLight(0xffffff, 1);
   light.position.set(5, 10, 5);
   scene.add(light);
@@ -72,44 +67,14 @@ export function renderEditor() {
   let tool: "place" | "delete" | "paint" = "place";
   let selected = BLOCKS[0];
 
-  const placed: THREE.Object3D[] = [];
+  const placed: THREE.Mesh[] = [];
   const grid = new Set<string>();
+
+  const key = (x:number,y:number,z:number)=>`${x},${y},${z}`;
 
   const loader = new GLTFLoader();
 
   let ghost: THREE.Group | null = null;
-  const ghostTarget = new THREE.Vector3();
-
-  const key = (x:number,y:number,z:number)=>`${x},${y},${z}`;
-
-  // ─────────────────────────────
-  // ROTATION SYSTEM (R T Y)
-  // ─────────────────────────────
-  let rotX = 0;
-  let rotY = 0;
-  let rotZ = 0;
-
-  window.addEventListener("keydown", (e) => {
-    const step = Math.PI / 2;
-
-    if (e.key === "r") rotY += step;
-    if (e.key === "t") rotX += step;
-    if (e.key === "y") rotZ += step;
-
-    if (ghost) ghost.rotation.set(rotX, rotY, rotZ);
-  });
-
-  // ─────────────────────────────
-  // SAFE MODEL
-  // ─────────────────────────────
-  function safeModel(b: any) {
-    return b?.model || BLOCKS[0].model;
-  }
-
-  // ─────────────────────────────
-  // LOAD BLUEPRINT (FROM GALLERY)
-  // ─────────────────────────────
-  const loaded = JSON.parse(localStorage.getItem("loaded_blueprint") || "null");
 
   // ─────────────────────────────
   // UI
@@ -118,10 +83,10 @@ export function renderEditor() {
   ui.style.position = "absolute";
   ui.style.top = "10px";
   ui.style.left = "10px";
-  ui.style.zIndex = "10";
   ui.style.background = "#111";
   ui.style.color = "#fff";
   ui.style.padding = "10px";
+  ui.style.zIndex = "10";
   document.body.appendChild(ui);
 
   function btn(text: string, fn: () => void) {
@@ -136,226 +101,172 @@ export function renderEditor() {
   btn("Paint", () => tool = "paint");
   btn("Save", save);
 
+  const colorPicker = document.createElement("input");
+  colorPicker.type = "color";
+  colorPicker.value = "#ffffff";
+  ui.appendChild(colorPicker);
+
+  btn("Gallery", async () => {
+    const m = await import("./gallery");
+    m.renderGallery();
+  });
+
   ui.appendChild(document.createElement("hr"));
 
   BLOCKS.forEach(b => {
-    const bbtn = document.createElement("button");
-    bbtn.innerText = b.name;
-
-    bbtn.onclick = () => {
-      selected = BLOCKS.find(x => x.id === b.id) || BLOCKS[0];
+    const bttn = document.createElement("button");
+    bttn.innerText = b.name;
+    bttn.onclick = () => {
+      selected = b;
       createGhost();
     };
-
-    ui.appendChild(bbtn);
+    ui.appendChild(bttn);
   });
 
   // ─────────────────────────────
-  // GHOST SYSTEM
+  // GHOST
   // ─────────────────────────────
   function createGhost() {
     if (ghost) scene.remove(ghost);
 
-    loader.load(
-      safeModel(selected),
-      gltf => {
-        ghost = gltf.scene;
+    loader.load(selected.model, gltf => {
+      ghost = gltf.scene;
 
-        ghost.traverse((c: any) => {
-          if (c.isMesh) {
-            c.material = new THREE.MeshBasicMaterial({
-              color: 0xff0000,
-              wireframe: true,
-              transparent: true,
-              opacity: 0.5
-            });
-          }
-        });
+      ghost.traverse((c: any) => {
+        if (c.isMesh) {
+          c.material = new THREE.MeshBasicMaterial({
+            color: 0xff0000,
+            wireframe: true,
+            transparent: true,
+            opacity: 0.5
+          });
+        }
+      });
 
-        ghost.position.copy(ghostTarget);
-        ghost.rotation.set(rotX, rotY, rotZ);
-
-        scene.add(ghost);
-      },
-      undefined,
-      () => {
-        const box = new THREE.Mesh(
-          new THREE.BoxGeometry(1,1,1),
-          new THREE.MeshBasicMaterial({ color: 0xff0000, wireframe: true })
-        );
-
-        ghost = new THREE.Group();
-        ghost.add(box);
-
-        scene.add(ghost);
-      }
-    );
+      scene.add(ghost);
+    });
   }
-
   createGhost();
 
   // ─────────────────────────────
-  // REBUILD LOADED BLUEPRINT
+  // MOUSE
   // ─────────────────────────────
-  if (loaded) {
-    loaded.forEach((b: any) => {
-      loader.load(safeModel({ model: "/blocks/block.glb" }), gltf => {
-        const obj = gltf.scene;
-
-        obj.position.set(b.x, b.y, b.z);
-        obj.rotation.set(b.rotX || 0, b.rotY || 0, b.rotZ || 0);
-
-        scene.add(obj);
-        placed.push(obj);
-        grid.add(key(b.x, b.y, b.z));
-      });
-    });
-  }
-
-  // ─────────────────────────────
-  // MOUSE MOVE (GROUND ONLY)
-  // ─────────────────────────────
-  window.addEventListener("pointermove", (e) => {
+  window.addEventListener("pointermove", e => {
     mouse.x = (e.clientX / innerWidth) * 2 - 1;
     mouse.y = -(e.clientY / innerHeight) * 2 + 1;
-
-    raycaster.setFromCamera(mouse, camera);
-
-    const hits = raycaster.intersectObject(ground);
-    if (!hits.length) return;
-
-    const p = hits[0].point;
-
-    ghostTarget.set(
-      Math.round(p.x),
-      Math.round(p.y),
-      Math.round(p.z)
-    );
-
-    if (ghost) {
-      ghost.position.copy(ghostTarget);
-      ghost.rotation.set(rotX, rotY, rotZ);
-    }
   });
 
-  // ─────────────────────────────
-  // FIND REAL OBJECT
-  // ─────────────────────────────
-  function findPlaced(obj: THREE.Object3D) {
-    while (obj && !placed.includes(obj)) {
-      obj = obj.parent!;
-    }
-    return placed.find(p => p === obj);
+  function updateRay() {
+    raycaster.setFromCamera(mouse, camera);
+    const hits = raycaster.intersectObjects([ground, ...placed], true);
+
+    if (!hits.length || !ghost) return;
+
+    const hit = hits[0];
+
+    const p = hit.point;
+    const n = hit.face?.normal || new THREE.Vector3(0, 1, 0);
+
+    const x = Math.round(p.x + n.x * 0.5);
+    const y = Math.round(p.y + n.y * 0.5);
+    const z = Math.round(p.z + n.z * 0.5);
+
+    const ok = canPlace(x, y, z);
+
+    ghost.visible = ok;
+    ghost.position.set(x, y, z);
+
+    (ghost.children[0] as any)?.material?.color?.set(
+      ok ? 0x00ff00 : 0xff0000
+    );
+  }
+
+  function inBounds(x:number,y:number,z:number){
+    const B = 20;
+    return Math.abs(x)<B && Math.abs(y)<B && Math.abs(z)<B;
+  }
+
+  function hasNeighbor(x:number,y:number,z:number){
+    return [
+      key(x+1,y,z), key(x-1,y,z),
+      key(x,y+1,z), key(x,y-1,z),
+      key(x,y,z+1), key(x,y,z-1),
+    ].some(k => grid.has(k));
+  }
+
+  function canPlace(x:number,y:number,z:number){
+    if (!inBounds(x,y,z)) return false;
+    if (placed.length === 0) return y === 0;
+    return hasNeighbor(x,y,z) && !grid.has(key(x,y,z));
   }
 
   // ─────────────────────────────
-  // PLACE FUNCTION
+  // PLACE BLOCK
   // ─────────────────────────────
   function place(x:number,y:number,z:number) {
-    const k = key(x,y,z);
-    if (grid.has(k)) return;
+    if (!canPlace(x,y,z)) return;
 
-    loader.load(safeModel(selected), gltf => {
+    loader.load(selected.model, gltf => {
       const obj = gltf.scene;
 
-      (obj as any).userData.id = selected.id;
+      obj.traverse((c:any) => {
+        if (c.isMesh) {
+          c.material = new THREE.MeshStandardMaterial({
+            color: 0xffffff
+          });
+        }
+      });
 
       obj.position.set(x,y,z);
-      obj.rotation.set(rotX, rotY, rotZ);
 
       scene.add(obj);
-      placed.push(obj);
-      grid.add(k);
+      placed.push(obj as any);
+      grid.add(key(x,y,z));
     });
   }
 
   // ─────────────────────────────
-  // PAINT SYSTEM (FIXED)
-  // ─────────────────────────────
-  function paintObject(obj: THREE.Object3D, color: string) {
-    obj.traverse((c: any) => {
-      if (c.isMesh) {
-        c.material = c.material.clone();
-        c.material.color = new THREE.Color(color);
-      }
-    });
-  }
-
-  // ─────────────────────────────
-  // CLICK SYSTEM (PLACE / DELETE / PAINT)
+  // CLICK
   // ─────────────────────────────
   window.addEventListener("pointerdown", () => {
     raycaster.setFromCamera(mouse, camera);
+    const hits = raycaster.intersectObjects([ground, ...placed], true);
 
-    const objectHits = raycaster.intersectObjects(placed, true);
-    const groundHits = raycaster.intersectObject(ground);
+    if (!hits.length || !ghost) return;
 
-    let x:number, y:number, z:number;
+    const p = hits[0].point;
+    const n = hits[0].face?.normal || new THREE.Vector3(0,1,0);
 
-    // ─ STACKING ─
-    if (objectHits.length && tool === "place") {
-      const hit = objectHits[0];
+    const x = Math.round(p.x + n.x * 0.5);
+    const y = Math.round(p.y + n.y * 0.5);
+    const z = Math.round(p.z + n.z * 0.5);
 
-      const obj = findPlaced(hit.object);
+    if (tool === "place") place(x,y,z);
+
+    if (tool === "delete") {
+      const obj = hits[0].object.parent;
       if (!obj) return;
 
-      const normal = hit.face?.normal?.clone() || new THREE.Vector3(0,1,0);
-
-      const world = obj.position.clone();
-
-      x = Math.round(world.x + normal.x);
-      y = Math.round(world.y + normal.y);
-      z = Math.round(world.z + normal.z);
-
-      place(x,y,z);
-      return;
+      scene.remove(obj);
     }
 
-    // ─ GROUND PLACE ─
-    if (groundHits.length && tool === "place") {
-      const p = groundHits[0].point;
-
-      x = Math.round(p.x);
-      y = Math.round(p.y);
-      z = Math.round(p.z);
-
-      place(x,y,z);
-      return;
-    }
-
-    // ─ DELETE ─
-    if (tool === "delete" && objectHits.length) {
-      const target = findPlaced(objectHits[0].object);
-      if (!target) return;
-
-      scene.remove(target);
-      placed.splice(placed.indexOf(target), 1);
-    }
-
-    // ─ PAINT ─
-    if (tool === "paint" && objectHits.length) {
-      const target = findPlaced(objectHits[0].object);
-      if (!target) return;
-
-      paintObject(target, "#ff0000");
+    if (tool === "paint") {
+      const obj = hits[0].object;
+      (obj as any).material.color = new THREE.Color(colorPicker.value);
     }
   });
 
   // ─────────────────────────────
-  // SAVE
+  // SAVE (IMPORTANT FORMAT FIX)
   // ─────────────────────────────
   async function save() {
     const { data } = await supabase.auth.getUser();
     if (!data.user) return;
 
-    const blueprint = placed.map(p => ({
+    const blueprint: BlockData[] = placed.map(p => ({
       x: p.position.x,
       y: p.position.y,
       z: p.position.z,
-      rotX: p.rotation.x,
-      rotY: p.rotation.y,
-      rotZ: p.rotation.z,
-      id: (p as any).userData?.id || "block",
       color: "#ffffff"
     }));
 
@@ -378,6 +289,7 @@ export function renderEditor() {
   function animate() {
     requestAnimationFrame(animate);
     controls.update();
+    updateRay();
     renderer.render(scene, camera);
   }
 
