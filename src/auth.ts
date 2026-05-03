@@ -1,7 +1,26 @@
 import { supabase } from "./supabase";
 
 // ─────────────────────────────
-// SIMPLE AUTH UI
+// CHECK USER
+// ─────────────────────────────
+export async function requireAuth() {
+  const { data } = await supabase.auth.getUser();
+
+  if (!data.user) {
+    alert("You must be logged in to use the editor");
+
+    // send them back to gallery
+    const m = await import("./pages/gallery");
+    m.renderGallery();
+
+    return null;
+  }
+
+  return data.user;
+}
+
+// ─────────────────────────────
+// SIMPLE AUTH UI (your existing)
 // ─────────────────────────────
 export function createAuthUI() {
   const container = document.createElement("div");
@@ -17,9 +36,6 @@ export function createAuthUI() {
 
   document.body.appendChild(container);
 
-  // ─────────────────────────────
-  // INPUTS
-  // ─────────────────────────────
   const emailInput = document.createElement("input");
   emailInput.placeholder = "Email";
   emailInput.style.width = "100%";
@@ -40,9 +56,6 @@ export function createAuthUI() {
   container.appendChild(passwordInput);
   container.appendChild(usernameInput);
 
-  // ─────────────────────────────
-  // BUTTONS
-  // ─────────────────────────────
   const loginBtn = document.createElement("button");
   loginBtn.innerText = "Login";
   loginBtn.style.width = "100%";
@@ -55,62 +68,38 @@ export function createAuthUI() {
   container.appendChild(loginBtn);
   container.appendChild(registerBtn);
 
-  // ─────────────────────────────
-  // LOGIN
-  // ─────────────────────────────
   loginBtn.onclick = async () => {
-    const email = emailInput.value;
-    const password = passwordInput.value;
-
     const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password
+      email: emailInput.value,
+      password: passwordInput.value
     });
 
-    if (error) {
-      alert(error.message);
-    } else {
-      alert("Logged in!");
-    }
+    if (error) alert(error.message);
+    else alert("Logged in!");
   };
 
-  // ─────────────────────────────
-  // REGISTER + USERNAME SYSTEM
-  // ─────────────────────────────
   registerBtn.onclick = async () => {
     const email = emailInput.value;
     const password = passwordInput.value;
     const username = usernameInput.value;
 
-    if (!username) {
-      alert("Please enter a username");
-      return;
-    }
+    if (!username) return alert("Enter username");
 
-    // check username uniqueness
     const { data: existing } = await supabase
       .from("profiles")
       .select("username")
       .eq("username", username)
       .single();
 
-    if (existing) {
-      alert("Username already taken");
-      return;
-    }
+    if (existing) return alert("Username taken");
 
-    // create auth account
     const { data, error } = await supabase.auth.signUp({
       email,
       password
     });
 
-    if (error) {
-      alert(error.message);
-      return;
-    }
+    if (error) return alert(error.message);
 
-    // store username in profiles table
     if (data.user) {
       await supabase.from("profiles").insert({
         id: data.user.id,
