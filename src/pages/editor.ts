@@ -141,29 +141,79 @@ export function renderEditor() {
   // ─────────────────────────────
   // BLOCK UI (UNCHANGED)
   // ─────────────────────────────
-  const panel = document.createElement("div");
-  panel.style.position = "absolute";
-  panel.style.left = "10px";
-  panel.style.top = "50%";
-  panel.style.transform = "translateY(-50%)";
-  panel.style.background = "#111";
-  panel.style.padding = "10px";
-  panel.style.display = "flex";
-  panel.style.flexDirection = "column";
-  panel.style.gap = "5px";
-  document.body.appendChild(panel);
+  // ─────────────────────────────
+// CATEGORY + BLOCK UI (NEW)
+// ─────────────────────────────
+const panel = document.createElement("div");
+panel.style.position = "absolute";
+panel.style.left = "10px";
+panel.style.top = "50%";
+panel.style.transform = "translateY(-50%)";
+panel.style.display = "flex";
+panel.style.gap = "10px";
+panel.style.background = "#111";
+panel.style.padding = "10px";
+document.body.appendChild(panel);
 
-  BLOCKS.forEach((b) => {
-    const btn = document.createElement("button");
-    btn.innerText = b.name;
+// LEFT: categories
+const catCol = document.createElement("div");
+catCol.style.display = "flex";
+catCol.style.flexDirection = "column";
+catCol.style.gap = "5px";
 
-    btn.onclick = () => {
-      selected = b;
-      createGhost();
+// RIGHT: blocks
+const blockCol = document.createElement("div");
+blockCol.style.display = "flex";
+blockCol.style.flexDirection = "column";
+blockCol.style.gap = "5px";
+blockCol.style.borderLeft = "1px solid #333";
+blockCol.style.paddingLeft = "10px";
+
+panel.appendChild(catCol);
+panel.appendChild(blockCol);
+
+// get categories from BLOCKS
+const categories = [...new Set(BLOCKS.map(b => b.category))];
+let currentCategory = categories[0];
+
+function renderUI() {
+  catCol.innerHTML = "";
+  blockCol.innerHTML = "";
+
+  // categories
+  categories.forEach(cat => {
+    const b = document.createElement("button");
+    b.innerText = cat;
+
+    b.onclick = () => {
+      currentCategory = cat;
+      renderUI();
     };
 
-    panel.appendChild(btn);
+    if (cat === currentCategory) {
+      b.style.background = "#444";
+    }
+
+    catCol.appendChild(b);
   });
+
+  // blocks
+  BLOCKS
+    .filter(b => b.category === currentCategory)
+    .forEach(block => {
+      const b = document.createElement("button");
+      b.innerText = block.name;
+
+      b.onclick = () => {
+        selected = block;
+        createGhost();
+      };
+
+      blockCol.appendChild(b);
+    });
+}
+
+renderUI();
 
   // ─────────────────────────────
   // GHOST (UNCHANGED)
