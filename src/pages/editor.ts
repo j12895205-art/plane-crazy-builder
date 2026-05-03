@@ -13,26 +13,22 @@ type BlockData = {
 
 export async function renderEditor() {
 
-  // 🔐 AUTH CHECK (NEW)
+  // 🔐 AUTH CHECK
   const { data } = await supabase.auth.getUser();
   if (!data.user) {
     alert("You must be logged in to use the editor.");
     const m = await import("./auth");
-    m.renderAuth();
+    m.createAuthUI(); // ✅ FIXED
     return;
   }
 
-  // ─────────────────────────────
   // RESET
-  // ─────────────────────────────
   document.body.innerHTML = "";
   document.body.style.margin = "0";
   document.body.style.overflow = "hidden";
   document.body.style.background = "#2b2b2b";
 
-  // ─────────────────────────────
-  // THREE SETUP
-  // ─────────────────────────────
+  // THREE
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x2b2b2b);
 
@@ -56,9 +52,7 @@ export async function renderEditor() {
 
   scene.add(new THREE.GridHelper(50, 50));
 
-  // ─────────────────────────────
   // INPUT
-  // ─────────────────────────────
   const raycaster = new THREE.Raycaster();
   const mouse = new THREE.Vector2();
 
@@ -69,9 +63,7 @@ export async function renderEditor() {
   ground.rotation.x = -Math.PI / 2;
   scene.add(ground);
 
-  // ─────────────────────────────
   // STATE
-  // ─────────────────────────────
   let tool: "place" | "delete" | "paint" = "place";
   let selected = BLOCKS[0];
 
@@ -89,9 +81,7 @@ export async function renderEditor() {
 
   let paintColor = "#ffffff";
 
-  // ─────────────────────────────
   // ROTATION
-  // ─────────────────────────────
   window.addEventListener("keydown", (e) => {
     const target = e.target as HTMLElement;
     if (["INPUT", "TEXTAREA", "BUTTON"].includes(target.tagName)) return;
@@ -105,9 +95,7 @@ export async function renderEditor() {
     if (ghost) ghost.rotation.set(rotX, rotY, rotZ);
   });
 
-  // ─────────────────────────────
   // TOP UI
-  // ─────────────────────────────
   const ui = document.createElement("div");
   ui.style.position = "absolute";
   ui.style.top = "10px";
@@ -125,12 +113,11 @@ export async function renderEditor() {
     ui.appendChild(b);
   }
 
-  btn("Place", () => (tool = "place"));
-  btn("Delete", () => (tool = "delete"));
-  btn("Paint", () => (tool = "paint"));
+  btn("Place", () => tool = "place");
+  btn("Delete", () => tool = "delete");
+  btn("Paint", () => tool = "paint");
   btn("Save", save);
 
-  // 🌐 NAVIGATION
   btn("Gallery", async () => {
     const m = await import("./gallery");
     m.renderGallery();
@@ -149,12 +136,10 @@ export async function renderEditor() {
   const colorPicker = document.createElement("input");
   colorPicker.type = "color";
   colorPicker.value = paintColor;
-  colorPicker.oninput = () => (paintColor = colorPicker.value);
+  colorPicker.oninput = () => paintColor = colorPicker.value;
   ui.appendChild(colorPicker);
 
-  // ─────────────────────────────
-  // CATEGORY + BLOCK UI
-  // ─────────────────────────────
+  // CATEGORY UI
   const panel = document.createElement("div");
   panel.style.position = "absolute";
   panel.style.left = "10px";
@@ -167,11 +152,12 @@ export async function renderEditor() {
   document.body.appendChild(panel);
 
   const catCol = document.createElement("div");
+  const blockCol = document.createElement("div");
+
   catCol.style.display = "flex";
   catCol.style.flexDirection = "column";
   catCol.style.gap = "5px";
 
-  const blockCol = document.createElement("div");
   blockCol.style.display = "flex";
   blockCol.style.flexDirection = "column";
   blockCol.style.gap = "5px";
@@ -214,9 +200,7 @@ export async function renderEditor() {
 
   renderUI();
 
-  // ─────────────────────────────
   // GHOST
-  // ─────────────────────────────
   function createGhost() {
     if (ghost) scene.remove(ghost);
 
@@ -241,9 +225,7 @@ export async function renderEditor() {
 
   createGhost();
 
-  // ─────────────────────────────
   // MOUSE
-  // ─────────────────────────────
   window.addEventListener("pointermove", (e) => {
     mouse.x = (e.clientX / innerWidth) * 2 - 1;
     mouse.y = -(e.clientY / innerHeight) * 2 + 1;
@@ -262,9 +244,7 @@ export async function renderEditor() {
     const y = Math.round(p.y + n.y * 0.5);
     const z = Math.round(p.z + n.z * 0.5);
 
-    const ok = !grid.has(key(x, y, z));
-
-    ghost.visible = ok;
+    ghost.visible = !grid.has(key(x, y, z));
     ghost.position.set(x, y, z);
   }
 
